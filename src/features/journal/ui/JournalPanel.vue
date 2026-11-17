@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { Download, Bookmark, Trash2, ArrowUpRight } from "lucide-vue-next";
 import { timecode } from "../../../shared/format";
+import { chapters } from "../../../shared/content";
 import type { Entry } from "../../../shared/types";
 import type { Journal } from "../model/entries";
 import { exportJournal } from "../lib/export";
 defineProps<{ journal: Journal }>();
 defineEmits<{ revisit: [entry: Entry] }>();
+
+function chapterName(id: string) {
+  return chapters.find((c) => c.id === id)?.title ?? id;
+}
 </script>
 <template>
   <section class="journal-panel">
@@ -40,7 +45,7 @@ defineEmits<{ revisit: [entry: Entry] }>();
     >
       <div>
         <small
-          >{{ timecode(e.time) }} ·
+          >原片位置 · {{ chapterName(e.chapterId) }} {{ timecode(e.time) }} ｜
           {{ new Date(e.createdAt).toLocaleDateString("zh-CN") }}</small
         >
         <h3>{{ e.title }}</h3>

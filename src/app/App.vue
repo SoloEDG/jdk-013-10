@@ -11,15 +11,24 @@ import {
   Compass,
   ChevronRight,
   X,
+  ListVideo,
 } from "lucide-vue-next";
 import { PanoramaView } from "../features/panorama";
 import { ChapterList, MediaPlayer, Transport } from "../features/chapters";
 import { HotspotLayer, HotspotDetail } from "../features/hotspots";
 import { InterviewPanel, PeopleList } from "../features/interviews";
 import { JournalPanel } from "../features/journal";
+import {
+  ProgramPanel,
+  ProgramBuilder,
+  ProgramStrip,
+  ProgramTransport,
+  ProgramCaption,
+} from "../features/program";
 import { createWorkspace } from "./workspace";
 const w = createWorkspace(),
   about = ref(false),
+  builder = ref(false),
   stage = ref<HTMLElement>(),
   fullError = ref("");
 async function fullscreen() {
@@ -44,6 +53,11 @@ async function fullscreen() {
           @click="w.tab.value = 'story'"
         >
           互动纪录片</button
+        ><button
+          :class="{ active: w.tab.value === 'program' }"
+          @click="w.tab.value = 'program'"
+        >
+          <ListVideo :size="14" /> 主题编单</button
         ><button
           :class="{ active: w.tab.value === 'journal' }"
           @click="w.tab.value = 'journal'"
@@ -76,10 +90,15 @@ async function fullscreen() {
               ><MediaPlayer
                 :playback="w.playback"
                 :branch="!!w.branch.personId.value"
+                :program="w.program"
               />
               <div class="stage-shade" />
               <div class="stage-top">
-                <span class="scene-badge"><span /> 360° 全景现场</span
+                <span class="scene-badge"
+                  ><span />
+                  {{
+                    w.program.active.value ? "主题编单放映中" : "360° 全景现场"
+                  }}</span
                 ><span class="location"
                   ><MapPin :size="13" />
                   {{ w.playback.chapter.value.location }}</span
@@ -88,10 +107,16 @@ async function fullscreen() {
               <HotspotLayer
                 :items="w.discovery.visible.value"
                 :camera="w.camera.camera"
-                :enabled="w.discovery.enabled.value && !w.branch.personId.value"
+                :enabled="
+                  w.discovery.enabled.value && !w.branch.personId.value
+                "
                 @open="w.dispatch({ type: 'hotspot', id: $event })"
               />
-              <div class="scene-caption">
+              <ProgramCaption
+                v-if="w.program.active.value"
+                :program="w.program"
+              />
+              <div v-else class="scene-caption">
                 <small
                   >CHAPTER 0{{
                     ["dawn", "craft", "night"].indexOf(
@@ -117,7 +142,15 @@ async function fullscreen() {
             /><InterviewPanel
               :branch="w.branch"
               @back="w.dispatch({ type: 'return' })"
-            /><Transport
+            />
+            <ProgramTransport
+              v-if="w.program.active.value"
+              :program="w.program"
+              :source-chapter-id="w.playback.state.chapterId"
+              :source-time="w.playback.state.time"
+            />
+            <Transport
+              v-else
               :playback="w.playback"
               :disabled="!!w.branch.personId.value"
               @reset="w.camera.reset()"
@@ -126,46 +159,70 @@ async function fullscreen() {
             <p v-if="fullError" role="status">{{ fullError }}</p>
           </section>
           <aside class="sidebar">
-            <div class="section-heading">
-              <h2>故事章节</h2>
-              <span>CHAPTERS</span>
-            </div>
-            <p class="sidebar-copy">循着潮水，走进他们的日常。</p>
-            <ChapterList
-              :active="w.playback.state.chapterId"
-              @select="w.dispatch({ type: 'chapter', id: $event })"
-            />
-            <div class="chapter-foot">
-              <Headphones :size="15" /><span>建议佩戴耳机，沉浸聆听</span>
-            </div>
-            <div class="explore-toggle">
-              <span><Eye :size="17" /> 场景探索热点</span
-              ><button
-                role="switch"
-                aria-label="显示热点"
-                :aria-checked="w.discovery.enabled.value"
-                :class="{ on: w.discovery.enabled.value }"
-                @click="w.discovery.enabled.value = !w.discovery.enabled.value"
-              >
-                <i />
+            <template v-if="w.program.active.value">
+              <ProgramStrip :program="w.program" @seek="w.program.seek($event)" />
+              <button class="exit-presentation" @click="w.exitPresentation()">
+                退出编单放映，返回自由探索
               </button>
-            </div>
-            <div class="discovery-count">
-              <span>已收集的故事</span
-              ><b
-                >{{
-                  w.journal.entries.value.length.toString().padStart(2, "0")
-                }}
-                <em>/ 06</em></b
-              >
-            </div>
-            <button class="journal-link" @click="w.tab.value = 'journal'">
-              <BookOpen :size="15" /> 打开我的探索手记
-              <ChevronRight :size="15" />
-            </button>
+              <div class="explore-toggle">
+                <span><Eye :size="17" /> 场景探索热点（临时支线）</span
+                ><button
+                  role="switch"
+                  aria-label="显示热点"
+                  :aria-checked="w.discovery.enabled.value"
+                  :class="{ on: w.discovery.enabled.value }"
+                  @click="w.discovery.enabled.value = !w.discovery.enabled.value"
+                >
+                  <i />
+                </button>
+              </div>
+              <button class="journal-link" @click="w.tab.value = 'journal'">
+                <BookOpen :size="15" /> 打开我的探索手记
+                <ChevronRight :size="15" />
+              </button>
+            </template>
+            <template v-else>
+              <div class="section-heading">
+                <h2>故事章节</h2>
+                <span>CHAPTERS</span>
+              </div>
+              <p class="sidebar-copy">循着潮水，走进他们的日常。</p>
+              <ChapterList
+                :active="w.playback.state.chapterId"
+                @select="w.dispatch({ type: 'chapter', id: $event })"
+              />
+              <div class="chapter-foot">
+                <Headphones :size="15" /><span>建议佩戴耳机，沉浸聆听</span>
+              </div>
+              <div class="explore-toggle">
+                <span><Eye :size="17" /> 场景探索热点</span
+                ><button
+                  role="switch"
+                  aria-label="显示热点"
+                  :aria-checked="w.discovery.enabled.value"
+                  :class="{ on: w.discovery.enabled.value }"
+                  @click="w.discovery.enabled.value = !w.discovery.enabled.value"
+                >
+                  <i />
+                </button>
+              </div>
+              <div class="discovery-count">
+                <span>已收集的故事</span
+                ><b
+                  >{{
+                    w.journal.entries.value.length.toString().padStart(2, "0")
+                  }}
+                  <em>/ 06</em></b
+                >
+              </div>
+              <button class="journal-link" @click="w.tab.value = 'journal'">
+                <BookOpen :size="15" /> 打开我的探索手记
+                <ChevronRight :size="15" />
+              </button>
+            </template>
           </aside>
         </div>
-        <section class="below">
+        <section class="below" v-if="!w.program.active.value">
           <div class="field-note">
             <small><Compass :size="14" /> EXPLORER'S NOTE</small>
             <h2>故事，不止一个方向。</h2>
@@ -180,7 +237,18 @@ async function fullscreen() {
             </div>
             <PeopleList @open="w.enterPerson($event)" />
           </div></section></template
-      ><JournalPanel
+      ><ProgramPanel
+        v-else-if="w.tab.value === 'program' && !builder"
+        :program="w.program"
+        @edit="builder = true"
+        @present="w.startPresentation()"
+      />
+      <ProgramBuilder
+        v-else-if="w.tab.value === 'program' && builder"
+        :program="w.program"
+        @close="builder = false"
+      />
+      <JournalPanel
         v-else
         :journal="w.journal"
         @revisit="w.dispatch({ type: 'revisit', entry: $event })"

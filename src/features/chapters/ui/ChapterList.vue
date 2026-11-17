@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { chapters } from "../../../shared/content";
 import { timecode } from "../../../shared/format";
-defineProps<{ active: string }>();
+defineProps<{ active: string; disabled?: boolean }>();
 defineEmits<{ select: [id: string] }>();
 </script>
 <template>
-  <div class="chapter-list">
+  <div class="chapter-list" :class="{ disabled }">
     <button
       v-for="(chapter, i) in chapters"
       :key="chapter.id"
       :class="{ active: active === chapter.id }"
+      :disabled="disabled"
       @click="$emit('select', chapter.id)"
     >
       <div

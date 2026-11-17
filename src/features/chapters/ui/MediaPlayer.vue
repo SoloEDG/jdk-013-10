@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import type { Playback } from "../model/playback";
-const props = defineProps<{ playback: Playback; branch: boolean }>();
+import type { Program } from "../../program/model/program";
+const props = defineProps<{
+  playback: Playback;
+  branch: boolean;
+  program?: Program;
+}>();
 const video = ref<HTMLVideoElement>();
 function sync() {
   const v = video.value;
@@ -28,6 +33,15 @@ watch(
   ],
   sync,
 );
+function onTimeUpdate(e: Event) {
+  const t = (e.target as HTMLVideoElement).currentTime;
+  if (props.program?.active.value) props.program.syncSourceTime(t);
+  else if (!props.branch && props.playback.state.playing) props.playback.tick(t);
+}
+function onEnded() {
+  if (props.program?.active.value) props.program.sourceEnded();
+  else props.playback.finish();
+}
 </script>
 <template>
   <video
@@ -41,12 +55,8 @@ watch(
       playback.state.ready = true;
       sync();
     "
-    @timeupdate="
-      !branch &&
-      playback.state.playing &&
-      playback.tick(($event.target as HTMLVideoElement).currentTime)
-    "
-    @ended="playback.finish()"
+    @timeupdate="onTimeUpdate"
+    @ended="onEnded"
     @error="playback.state.error = '影像加载失败，请刷新重试'"
   />
   <div v-if="playback.state.error" role="status" class="media-warning">
